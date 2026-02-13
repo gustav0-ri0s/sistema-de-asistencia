@@ -18,6 +18,7 @@ import BimesterReport from './components/BimesterReport.tsx';
 import ClassroomReportDetail from './components/ClassroomReportDetail.tsx';
 import Login from './components/Login.tsx';
 import { supabase } from './lib/supabase';
+import logo from './image/logo.png';
 
 const App: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -168,9 +169,7 @@ const App: React.FC = () => {
       `}>
         <div className="flex flex-col h-full">
           <div className="p-10 flex flex-col items-center border-b border-slate-50">
-            <div className="w-16 h-16 rounded-3xl bg-brand-celeste flex items-center justify-center shadow-lg shadow-cyan-100 mb-4">
-              <School className="text-white" size={32} />
-            </div>
+            <img src={logo} alt="Logo" className="w-24 h-24 mb-4 object-contain shadow-cyan-100 drop-shadow-lg" />
             <h1 className="text-lg font-black text-slate-800">ASISTENCIA</h1>
             <p className="text-[10px] text-brand-celeste font-bold tracking-widest uppercase">Valores y Ciencias</p>
           </div>
