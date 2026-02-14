@@ -19,9 +19,10 @@ interface AttendanceSheetProps {
   userId?: string;
   onBack: () => void;
   onViewReport: () => void;
+  showToast?: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, onBack, onViewReport }) => {
+const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, onBack, onViewReport, showToast }) => {
   const [students, setStudents] = useState<Student[]>([]);
   const [attendance, setAttendance] = useState<Record<string, AttendanceStatus>>({});
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -72,7 +73,8 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
 
   const saveAttendance = async () => {
     if (Object.keys(attendance).length === 0) {
-      alert('Por favor, marque la asistencia de al menos un estudiante.');
+      if (showToast) showToast('Por favor, marque la asistencia de al menos un estudiante.', 'error');
+      else alert('Por favor, marque la asistencia de al menos un estudiante.');
       return;
     }
 
@@ -106,11 +108,13 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
 
       if (error) throw error;
 
-      alert('Asistencia guardada exitosamente');
+      if (showToast) showToast('Asistencia guardada exitosamente', 'success');
+      else alert('Asistencia guardada exitosamente');
       onBack();
     } catch (err: any) {
       console.error('Error saving attendance:', err);
-      alert('Error al guardar asistencia: ' + err.message);
+      if (showToast) showToast('Error al guardar asistencia: ' + err.message, 'error');
+      else alert('Error al guardar asistencia: ' + err.message);
     } finally {
       setSaving(false);
     }

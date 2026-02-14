@@ -34,10 +34,24 @@ export interface StaffMember {
   }[];
 }
 
+export interface Meeting {
+  id: string;
+  title: string;
+  date: string;
+  classroom_id: string;
+  classroom_name: string;
+  created_at: string;
+  attendance_count: number;
+  total_students: number;
+}
+
 export type ViewState =
   | 'DASHBOARD'
   | 'ATTENDANCE_SHEET'
   | 'REPORTS'
   | 'MANAGEMENT'
   | 'BIMESTER_REPORT'
-  | 'CLASSROOM_REPORT_DETAIL';
+  | 'CLASSROOM_REPORT_DETAIL'
+  | 'MEETINGS'
+  | 'MEETING_ATTENDANCE_SHEET'
+  | 'MEETING_DETAIL';

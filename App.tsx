@@ -7,15 +7,22 @@ import {
   LogOut,
   Menu,
   UserCircle2,
-  CalendarCheck
+  CalendarCheck,
+  CalendarDays,
+  CheckCircle2,
+  XCircle,
+  AlertCircle
 } from 'lucide-react';
-import { ViewState, Classroom, StaffMember, UserRole } from './types.ts';
+import { ViewState, Classroom, StaffMember, UserRole, Meeting } from './types.ts';
 import Dashboard from './components/Dashboard.tsx';
 import AttendanceSheet from './components/AttendanceSheet.tsx';
 import Reports from './components/Reports.tsx';
 import Management from './components/Management.tsx';
 import BimesterReport from './components/BimesterReport.tsx';
 import ClassroomReportDetail from './components/ClassroomReportDetail.tsx';
+import Meetings from './components/Meetings.tsx';
+import MeetingAttendanceSheet from './components/MeetingAttendanceSheet.tsx';
+import MeetingDetail from './components/MeetingDetail.tsx';
 import Login from './components/Login.tsx';
 import { supabase } from './lib/supabase';
 import logo from './image/logo.png';
@@ -27,11 +34,24 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [reportConfig, setReportConfig] = useState<{ date: string, range: string, endDate?: string }>({
     date: new Date().toISOString().split('T')[0],
     range: 'Día'
   });
+  const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info', visible: boolean }>({
+    message: '',
+    type: 'success',
+    visible: false
+  });
+
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type, visible: true });
+    setTimeout(() => {
+      setToast(prev => ({ ...prev, visible: false }));
+    }, 3000);
+  };
 
   useEffect(() => {
     // Get initial session
@@ -106,6 +126,7 @@ const App: React.FC = () => {
 
   const navItems = currentUser ? [
     { id: 'DASHBOARD', icon: ClipboardCheck, label: 'Control Diario' },
+    { id: 'MEETINGS', icon: CalendarDays, label: 'Reuniones' },
     { id: 'REPORTS', icon: BarChart3, label: 'Reportes' },
     ...(currentUser.role === 'Administrador' ? [{ id: 'MANAGEMENT', icon: Settings2, label: 'Gestión Salones' }] : []),
   ] : [];
@@ -137,10 +158,13 @@ const App: React.FC = () => {
   }
 
   if (!isAuthenticated) {
-    return <Login onLogin={(session) => {
-      setSession(session);
-      setIsAuthenticated(true);
-    }} />;
+    return <Login
+      onLogin={(session) => {
+        setSession(session);
+        setIsAuthenticated(true);
+      }}
+      showToast={showToast}
+    />;
   }
 
   if (!currentUser) {
@@ -245,6 +269,7 @@ const App: React.FC = () => {
               userId={currentUser?.id}
               onBack={() => setCurrentView('DASHBOARD')}
               onViewReport={() => setCurrentView('BIMESTER_REPORT')}
+              showToast={showToast}
             />
           )}
           {currentView === 'BIMESTER_REPORT' && selectedClassroom && (
@@ -257,7 +282,7 @@ const App: React.FC = () => {
             <Reports onSelectClassroom={handleOpenClassroomReport} />
           )}
           {currentView === 'MANAGEMENT' && (
-            <Management />
+            <Management showToast={showToast} />
           )}
           {currentView === 'CLASSROOM_REPORT_DETAIL' && selectedClassroom && (
             <ClassroomReportDetail
@@ -268,7 +293,72 @@ const App: React.FC = () => {
               onBack={() => setCurrentView('REPORTS')}
             />
           )}
+          {currentView === 'MEETINGS' && (
+            <Meetings
+              showToast={showToast}
+              onCreateMeeting={(classroom, meetingId, meetingTitle) => {
+                setSelectedClassroom(classroom);
+                setSelectedMeeting({
+                  id: meetingId,
+                  title: meetingTitle,
+                  date: new Date().toISOString().split('T')[0],
+                  classroom_id: classroom.id,
+                  classroom_name: classroom.name,
+                  created_at: new Date().toISOString(),
+                  attendance_count: 0,
+                  total_students: 0
+                });
+                setCurrentView('MEETING_ATTENDANCE_SHEET');
+              }}
+              onViewMeetingDetail={(meeting) => {
+                setSelectedMeeting(meeting);
+                setCurrentView('MEETING_DETAIL');
+              }}
+            />
+          )}
+          {currentView === 'MEETING_ATTENDANCE_SHEET' && selectedClassroom && selectedMeeting && (
+            <MeetingAttendanceSheet
+              classroom={selectedClassroom}
+              meetingId={selectedMeeting.id}
+              meetingTitle={selectedMeeting.title}
+              onBack={() => setCurrentView('MEETINGS')}
+              showToast={showToast}
+            />
+          )}
+          {currentView === 'MEETING_DETAIL' && selectedMeeting && (
+            <MeetingDetail
+              meeting={selectedMeeting}
+              onBack={() => setCurrentView('MEETINGS')}
+              onEditAttendance={(meeting) => {
+                setSelectedMeeting(meeting);
+                // Also need to set classroom for the attendance sheet
+                const classroom = {
+                  id: meeting.classroom_id,
+                  name: meeting.classroom_name,
+                  level: 'Primaria', // Should really fetch actual level or store it
+                  studentCount: 0
+                };
+                setSelectedClassroom(classroom as Classroom);
+                setCurrentView('MEETING_ATTENDANCE_SHEET');
+              }}
+            />
+          )}
         </div>
+
+        {/* Floating Toast Notification */}
+        {toast.visible && (
+          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 duration-300">
+            <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' :
+              toast.type === 'error' ? 'bg-rose-500 border-rose-400 text-white' :
+                'bg-slate-800 border-slate-700 text-white'
+              }`}>
+              {toast.type === 'success' && <CheckCircle2 size={20} />}
+              {toast.type === 'error' && <XCircle size={20} />}
+              {toast.type === 'info' && <AlertCircle size={20} />}
+              <span className="font-black text-sm tracking-tight">{toast.message}</span>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );

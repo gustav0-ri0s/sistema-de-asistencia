@@ -159,7 +159,11 @@ const AssignmentModal: React.FC<AssignmentModalProps> = ({ member, classrooms, e
   );
 };
 
-const Management: React.FC = () => {
+interface ManagementProps {
+  showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+}
+
+const Management: React.FC<ManagementProps> = ({ showToast }) => {
   const [users, setUsers] = React.useState<StaffMember[]>([]);
   const [classrooms, setClassrooms] = React.useState<Classroom[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -266,11 +270,12 @@ const Management: React.FC = () => {
 
       // 3. Refresh local state
       await fetchData();
+      showToast('Asignaciones guardadas correctamente', 'success');
       setEditingMember(null);
 
     } catch (err) {
       console.error('Error saving assignments:', err);
-      alert('Error al guardar asignaciones');
+      showToast('Error al guardar asignaciones', 'error');
     }
   };
 
