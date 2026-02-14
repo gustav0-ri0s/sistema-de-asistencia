@@ -30,12 +30,17 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
   const [saving, setSaving] = useState(false);
 
   React.useEffect(() => {
-    fetchStudents();
+    const init = async () => {
+      setLoading(true);
+      await fetchStudents();
+      await fetchExistingAttendance();
+      setLoading(false);
+    };
+    init();
   }, [classroom]);
 
   const fetchStudents = async () => {
     try {
-      setLoading(true);
       const { data, error } = await supabase
         .from('students')
         .select('*')
@@ -54,8 +59,36 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
       setStudents(mappedStudents);
     } catch (err) {
       console.error('Error fetching students:', err);
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchExistingAttendance = async () => {
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('classroom_id', classroom.id)
+        .eq('date', date);
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const attendanceMap: Record<string, AttendanceStatus> = {};
+        const notesMap: Record<string, string> = {};
+
+        data.forEach((record: any) => {
+          attendanceMap[record.student_id] = record.status as AttendanceStatus;
+          if (record.notes) {
+            notesMap[record.student_id] = record.notes;
+          }
+        });
+
+        setAttendance(attendanceMap);
+        setNotes(notesMap);
+      }
+    } catch (err) {
+      console.error('Error fetching existing attendance:', err);
     }
   };
 
@@ -74,7 +107,6 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
   const saveAttendance = async () => {
     if (Object.keys(attendance).length === 0) {
       if (showToast) showToast('Por favor, marque la asistencia de al menos un estudiante.', 'error');
-      else alert('Por favor, marque la asistencia de al menos un estudiante.');
       return;
     }
 
@@ -109,12 +141,10 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, on
       if (error) throw error;
 
       if (showToast) showToast('Asistencia guardada exitosamente', 'success');
-      else alert('Asistencia guardada exitosamente');
       onBack();
     } catch (err: any) {
       console.error('Error saving attendance:', err);
       if (showToast) showToast('Error al guardar asistencia: ' + err.message, 'error');
-      else alert('Error al guardar asistencia: ' + err.message);
     } finally {
       setSaving(false);
     }

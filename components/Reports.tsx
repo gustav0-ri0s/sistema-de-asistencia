@@ -245,12 +245,12 @@ const Reports: React.FC<ReportsProps> = ({ onSelectClassroom }) => {
                     </span>
                   </td>
                   <td className="px-8 py-5 text-center font-bold text-slate-600">
-                    {Math.round(c.studentCount * (0.9 + Math.random() * 0.1))}
+                    {c.presentCount}
                   </td>
                   <td className="px-8 py-5 text-center font-bold text-rose-400">
-                    {Math.floor(Math.random() * 3)}
+                    {c.absentCount}
                   </td>
-                  <td className="px-8 py-5 text-right font-black text-brand-celeste">96.5%</td>
+                  <td className="px-8 py-5 text-right font-black text-brand-celeste">{c.percentage}%</td>
                   <td className="px-8 py-5 text-center">
                     <div className="inline-flex p-2.5 bg-slate-50 rounded-xl text-slate-300 group-hover:bg-brand-celeste group-hover:text-white transition-all shadow-sm">
                       <List size={16} />
