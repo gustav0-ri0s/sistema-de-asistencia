@@ -59,7 +59,7 @@ const BimesterReport: React.FC<BimesterReportProps> = ({ classroom, onBack }) =>
         id: s.id,
         name: `${s.last_name}, ${s.first_name}`,
         dni: s.dni || '---',
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.id}`
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.first_name + ' ' + s.last_name)}&background=random&color=fff&rounded=true&bold=true`
       })));
 
     } catch (err) {

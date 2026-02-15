@@ -23,6 +23,7 @@ import ClassroomReportDetail from './components/ClassroomReportDetail.tsx';
 import Meetings from './components/Meetings.tsx';
 import MeetingAttendanceSheet from './components/MeetingAttendanceSheet.tsx';
 import MeetingDetail from './components/MeetingDetail.tsx';
+import MeetingReports from './components/MeetingReports.tsx';
 import Login from './components/Login.tsx';
 import { supabase } from './lib/supabase';
 import logo from './image/logo.png';
@@ -35,6 +36,7 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
+  const [meetingReturnView, setMeetingReturnView] = useState<ViewState>('MEETINGS');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [reportConfig, setReportConfig] = useState<{ date: string, range: string, endDate?: string }>({
     date: new Date().toISOString().split('T')[0],
@@ -267,6 +269,7 @@ const App: React.FC = () => {
             <AttendanceSheet
               classroom={selectedClassroom}
               userId={currentUser?.id}
+              userName={currentUser?.name}
               onBack={() => setCurrentView('DASHBOARD')}
               onViewReport={() => setCurrentView('BIMESTER_REPORT')}
               showToast={showToast}
@@ -278,8 +281,15 @@ const App: React.FC = () => {
               onBack={() => setCurrentView('ATTENDANCE_SHEET')}
             />
           )}
-          {currentView === 'REPORTS' && (
-            <Reports onSelectClassroom={handleOpenClassroomReport} />
+          {currentView === 'REPORTS' && currentUser && (
+            <Reports
+              user={currentUser}
+              onSelectClassroom={handleOpenClassroomReport}
+              onViewMeetingReports={() => {
+                setMeetingReturnView('MEETING_REPORTS');
+                setCurrentView('MEETING_REPORTS');
+              }}
+            />
           )}
           {currentView === 'MANAGEMENT' && (
             <Management showToast={showToast} />
@@ -293,8 +303,20 @@ const App: React.FC = () => {
               onBack={() => setCurrentView('REPORTS')}
             />
           )}
-          {currentView === 'MEETINGS' && (
+          {currentView === 'MEETING_REPORTS' && currentUser && (
+            <MeetingReports
+              user={currentUser}
+              onBack={() => setCurrentView('REPORTS')}
+              onViewDetail={(meeting) => {
+                setSelectedMeeting(meeting);
+                setMeetingReturnView('MEETING_REPORTS');
+                setCurrentView('MEETING_DETAIL');
+              }}
+            />
+          )}
+          {currentView === 'MEETINGS' && currentUser && (
             <Meetings
+              user={currentUser}
               showToast={showToast}
               onCreateMeeting={(classroom, meetingId, meetingTitle) => {
                 setSelectedClassroom(classroom);
@@ -312,6 +334,7 @@ const App: React.FC = () => {
               }}
               onViewMeetingDetail={(meeting) => {
                 setSelectedMeeting(meeting);
+                setMeetingReturnView('MEETINGS');
                 setCurrentView('MEETING_DETAIL');
               }}
             />
@@ -328,7 +351,7 @@ const App: React.FC = () => {
           {currentView === 'MEETING_DETAIL' && selectedMeeting && (
             <MeetingDetail
               meeting={selectedMeeting}
-              onBack={() => setCurrentView('MEETINGS')}
+              onBack={() => setCurrentView(meetingReturnView)}
               onEditAttendance={(meeting) => {
                 setSelectedMeeting(meeting);
                 // Also need to set classroom for the attendance sheet

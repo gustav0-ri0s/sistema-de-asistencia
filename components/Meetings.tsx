@@ -10,7 +10,7 @@ import {
     Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { Classroom } from '../types';
+import { Classroom, StaffMember } from '../types';
 
 interface Meeting {
     id: string;
@@ -24,12 +24,13 @@ interface Meeting {
 }
 
 interface MeetingsProps {
+    user: StaffMember;
     onCreateMeeting: (classroom: Classroom, meetingId: string, meetingTitle: string) => void;
     onViewMeetingDetail: (meeting: Meeting) => void;
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-const Meetings: React.FC<MeetingsProps> = ({ onCreateMeeting, onViewMeetingDetail, showToast }) => {
+const Meetings: React.FC<MeetingsProps> = ({ user, onCreateMeeting, onViewMeetingDetail, showToast }) => {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [classrooms, setClassrooms] = useState<Classroom[]>([]);
     const [loading, setLoading] = useState(true);
@@ -43,7 +44,7 @@ const Meetings: React.FC<MeetingsProps> = ({ onCreateMeeting, onViewMeetingDetai
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [user]);
 
     const fetchData = async () => {
         try {
@@ -58,7 +59,8 @@ const Meetings: React.FC<MeetingsProps> = ({ onCreateMeeting, onViewMeetingDetai
 
     const fetchMeetings = async () => {
         try {
-            const { data, error } = await supabase
+            // If admin, fetch all meetings. If teacher, fetch meetings of their assigned classrooms.
+            let query = supabase
                 .from('meetings')
                 .select(`
           id,
@@ -67,10 +69,23 @@ const Meetings: React.FC<MeetingsProps> = ({ onCreateMeeting, onViewMeetingDetai
           classroom_id,
           created_at,
           classrooms (
-            name
+            name,
+            level
           )
-        `)
-                .order('date', { ascending: false });
+        `);
+
+            if (user.role !== 'Administrador' && user.role !== 'Supervisor') {
+                const assignedClassroomIds = user.assignments.map(a => a.classroomId).filter(Boolean);
+                if (assignedClassroomIds.length > 0) {
+                    query = query.in('classroom_id', assignedClassroomIds.map(id => parseInt(id)));
+                } else {
+                    // No assignments, no meetings
+                    setMeetings([]);
+                    return;
+                }
+            }
+
+            const { data, error } = await query.order('date', { ascending: false });
 
             if (error) throw error;
 
@@ -108,21 +123,31 @@ const Meetings: React.FC<MeetingsProps> = ({ onCreateMeeting, onViewMeetingDetai
 
     const fetchClassrooms = async () => {
         try {
-            const { data, error } = await supabase
+            const { data: classroomsData, error } = await supabase
                 .from('classrooms')
                 .select('*')
+                .eq('active', true)
                 .order('name', { ascending: true });
 
             if (error) throw error;
 
-            const mappedClassrooms: Classroom[] = data.map((c: any) => ({
+            const mapped = classroomsData.map((c: any) => ({
                 id: c.id.toString(),
                 name: c.name,
-                level: c.level,
+                level: c.level.charAt(0).toUpperCase() + c.level.slice(1) as any,
                 studentCount: 0
             }));
 
-            setClassrooms(mappedClassrooms);
+            // Filter classrooms like in Dashboard
+            const filtered = (user.role === 'Administrador' || user.role === 'Supervisor')
+                ? mapped
+                : mapped.filter(classroom =>
+                    user.assignments.some(assign =>
+                        assign.classroomId === classroom.id || assign.level === classroom.level
+                    )
+                );
+
+            setClassrooms(filtered);
         } catch (err) {
             console.error('Error fetching classrooms:', err);
         }

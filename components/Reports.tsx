@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { Calendar, Search, TrendingUp, Filter, List, CalendarRange, ArrowRight, Play } from 'lucide-react';
-import { Classroom, AttendanceStatus } from '../types.ts';
+import { Classroom, AttendanceStatus, StaffMember } from '../types.ts';
 import { supabase } from '../lib/supabase.ts';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users, CalendarDays } from 'lucide-react';
 
 interface ClassroomStats extends Classroom {
   presentCount: number;
@@ -12,10 +12,12 @@ interface ClassroomStats extends Classroom {
 }
 
 interface ReportsProps {
+  user: StaffMember;
   onSelectClassroom: (classroom: Classroom, date: string, range: string, endDate?: string) => void;
+  onViewMeetingReports: () => void;
 }
 
-const Reports: React.FC<ReportsProps> = ({ onSelectClassroom }) => {
+const Reports: React.FC<ReportsProps> = ({ user, onSelectClassroom, onViewMeetingReports }) => {
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [range, setRange] = useState('Día');
@@ -64,8 +66,17 @@ const Reports: React.FC<ReportsProps> = ({ onSelectClassroom }) => {
       const { data: attendanceData, error: attendanceError } = await attendanceQuery;
       if (attendanceError) throw attendanceError;
 
+      // Filter classrooms by assignments if not Admin or Supervisor
+      const filteredClassroomsData = (user.role === 'Administrador' || user.role === 'Supervisor')
+        ? classroomsData
+        : classroomsData.filter((c: any) =>
+          user.assignments.some(assign =>
+            assign.classroomId === c.id.toString() || assign.level === c.level
+          )
+        );
+
       // 3. Process data
-      const stats = classroomsData.map((c: any) => {
+      const stats = filteredClassroomsData.map((c: any) => {
         const studentCount = c.students[0]?.count || 0;
         const classroomAttendance = attendanceData.filter(a => a.classroom_id === c.id);
 
@@ -82,7 +93,7 @@ const Reports: React.FC<ReportsProps> = ({ onSelectClassroom }) => {
         const percentage = totalMarked > 0 ? (present / totalMarked) * 100 : 0;
 
         return {
-          id: c.id,
+          id: c.id.toString(),
           name: c.name || `${c.grade} ${c.section}`,
           level: c.level,
           studentCount,
@@ -124,6 +135,13 @@ const Reports: React.FC<ReportsProps> = ({ onSelectClassroom }) => {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Reportes</h2>
           <p className="text-slate-400 text-sm font-medium tracking-tight">Consulta la asistencia por fecha, rango o periodos académicos.</p>
         </div>
+        <button
+          onClick={onViewMeetingReports}
+          className="flex items-center gap-3 bg-amber-500 text-white px-8 py-4 rounded-[2rem] font-black text-xs tracking-[0.1em] hover:bg-amber-600 transition-all shadow-xl shadow-amber-100/50 border-4 border-white active:scale-95"
+        >
+          <CalendarDays size={20} className="text-amber-100" />
+          REPORTES DE REUNIONES
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
