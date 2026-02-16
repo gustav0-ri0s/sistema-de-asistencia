@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import {
+  Routes,
+  Route,
+  useLocation,
+  useNavigate,
+  Navigate
+} from 'react-router-dom';
+import {
   ClipboardCheck,
   BarChart3,
   Settings2,
-  School,
   LogOut,
   Menu,
   UserCircle2,
@@ -13,7 +19,7 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react';
-import { ViewState, Classroom, StaffMember, UserRole, Meeting } from './types.ts';
+import { Classroom, StaffMember, UserRole, Meeting } from './types.ts';
 import Dashboard from './components/Dashboard.tsx';
 import AttendanceSheet from './components/AttendanceSheet.tsx';
 import Reports from './components/Reports.tsx';
@@ -24,24 +30,23 @@ import Meetings from './components/Meetings.tsx';
 import MeetingAttendanceSheet from './components/MeetingAttendanceSheet.tsx';
 import MeetingDetail from './components/MeetingDetail.tsx';
 import MeetingReports from './components/MeetingReports.tsx';
-import Login from './components/Login.tsx';
+import AuthCallback from './components/AuthCallback.tsx';
+import RequireAuth from './components/RequireAuth.tsx';
 import { supabase } from './lib/supabase';
 import logo from './image/logo.png';
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [session, setSession] = useState<any>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentUser, setCurrentUser] = useState<StaffMember | null>(null);
   const [loading, setLoading] = useState(true);
-  const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [selectedClassroom, setSelectedClassroom] = useState<Classroom | null>(null);
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
-  const [meetingReturnView, setMeetingReturnView] = useState<ViewState>('MEETINGS');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [reportConfig, setReportConfig] = useState<{ date: string, range: string, endDate?: string }>({
     date: new Date().toISOString().split('T')[0],
     range: 'Día'
   });
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' | 'info', visible: boolean }>({
     message: '',
     type: 'success',
@@ -56,25 +61,20 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setIsAuthenticated(!!session);
-      if (session) {
-        fetchProfile(session.user.id);
-      } else {
-        setLoading(false);
-      }
-    });
-
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      setIsAuthenticated(!!session);
       if (session) {
         fetchProfile(session.user.id);
       } else {
         setCurrentUser(null);
+        setLoading(false);
+      }
+    });
+
+    // Initial check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        fetchProfile(session.user.id);
+      } else {
         setLoading(false);
       }
     });
@@ -97,9 +97,9 @@ const App: React.FC = () => {
         'admin': 'Administrador',
         'docente': 'Docente',
         'auxiliar': 'Auxiliar',
-        'supervisor': 'Administrador', // Mapping for now
+        'supervisor': 'Supervisor' as any,
         'subdirector': 'Administrador',
-        'secretaria': 'Auxiliar'
+        'secretaria': 'Secretaria' as any
       };
 
       // Fetch assignments to classroom
@@ -123,21 +123,15 @@ const App: React.FC = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    setCurrentView('DASHBOARD');
+    window.location.href = import.meta.env.VITE_PORTAL_URL || '/';
   };
 
-  const navItems = currentUser ? [
-    { id: 'DASHBOARD', icon: ClipboardCheck, label: 'Control Diario' },
-    { id: 'MEETINGS', icon: CalendarDays, label: 'Reuniones' },
-    { id: 'REPORTS', icon: BarChart3, label: 'Reportes' },
-    ...(currentUser.role === 'Administrador' ? [{ id: 'MANAGEMENT', icon: Settings2, label: 'Gestión Salones' }] : []),
-  ] : [];
-
-  const handleOpenClassroomReport = (classroom: Classroom, date: string, range: string, endDate?: string) => {
-    setSelectedClassroom(classroom);
-    setReportConfig({ date, range, endDate });
-    setCurrentView('CLASSROOM_REPORT_DETAIL');
-  };
+  const navItems = [
+    { id: 'DASHBOARD', icon: ClipboardCheck, label: 'Control Diario', path: '/' },
+    { id: 'MEETINGS', icon: CalendarDays, label: 'Reuniones', path: '/reuniones' },
+    { id: 'REPORTS', icon: BarChart3, label: 'Reportes', path: '/reportes' },
+    ...(currentUser?.role === 'Administrador' ? [{ id: 'MANAGEMENT', icon: Settings2, label: 'Gestión Salones', path: '/gestion' }] : []),
+  ];
 
   const getFormattedDate = () => {
     const date = new Intl.DateTimeFormat('es-PE', {
@@ -150,240 +144,241 @@ const App: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#0d1117]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-brand-celeste border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-bold text-slate-500">Cargando sistema...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return <Login
-      onLogin={(session) => {
-        setSession(session);
-        setIsAuthenticated(true);
-      }}
-      showToast={showToast}
-    />;
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-brand-celeste border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-bold text-slate-500">Cargando perfil...</p>
-          <button onClick={handleLogout} className="mt-4 text-xs text-slate-400 hover:text-brand-celeste underline">
-            Cerrar sesión si el error persiste
-          </button>
+          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-400 font-medium tracking-tight">Cargando sistema...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-50 overflow-hidden">
-      {isSidebarOpen && (
-        <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
-      )}
+    <Routes>
+      <Route path="/auth/callback" element={<AuthCallback />} />
+      <Route
+        path="*"
+        element={
+          <RequireAuth>
+            <div className="flex min-h-screen bg-slate-50 overflow-hidden">
+              {isSidebarOpen && (
+                <div className="fixed inset-0 bg-black/40 z-40 lg:hidden" onClick={() => setIsSidebarOpen(false)} />
+              )}
 
-      <aside className={`
-        fixed lg:static inset-y-0 left-0 w-64 bg-white z-50 transform transition-transform duration-300 ease-in-out border-r border-slate-100 print:hidden
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        <div className="flex flex-col h-full">
-          <div className="p-10 flex flex-col items-center border-b border-slate-50">
-            <img src={logo} alt="Logo" className="w-24 h-24 mb-4 object-contain shadow-cyan-100 drop-shadow-lg" />
-            <h1 className="text-lg font-black text-slate-800">ASISTENCIA</h1>
-            <p className="text-[10px] text-brand-celeste font-bold tracking-widest uppercase">Valores y Ciencias</p>
-          </div>
+              <aside className={`
+                fixed lg:static inset-y-0 left-0 w-72 bg-white z-50 transform transition-transform duration-300 ease-in-out border-r border-slate-100 print:hidden
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+              `}>
+                <div className="flex flex-col h-full">
+                  <div className="p-10 flex flex-col items-center border-b border-slate-50">
+                    <img src={logo} alt="Logo" className="w-24 h-24 mb-4 object-contain shadow-cyan-100 drop-shadow-lg" />
+                    <h1 className="text-lg font-black text-slate-800 uppercase tracking-tighter">Asistencia</h1>
+                    <div className="px-3 py-1 bg-brand-celeste/10 rounded-full mt-1">
+                      <p className="text-[10px] text-brand-celeste font-bold tracking-widest uppercase">Valores y Ciencias</p>
+                    </div>
+                  </div>
 
-          <nav className="flex-1 px-4 py-8 space-y-3">
-            {navItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setCurrentView(item.id as ViewState);
-                  setIsSidebarOpen(false);
-                }}
-                className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl transition-all ${currentView === item.id
-                  ? 'bg-brand-celeste text-white shadow-lg shadow-cyan-100'
-                  : 'text-slate-400 hover:bg-slate-50 hover:text-brand-celeste'
-                  }`}
-              >
-                <item.icon size={20} />
-                <span className="font-bold text-sm tracking-tight">{item.label}</span>
-              </button>
-            ))}
-          </nav>
+                  <nav className="flex-1 px-4 py-8 space-y-2">
+                    {navItems.map((item) => {
+                      const isActive = location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path));
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            navigate(item.path);
+                            setIsSidebarOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all duration-200 ${isActive
+                            ? 'bg-brand-celeste text-white shadow-xl shadow-cyan-200 scale-[1.02]'
+                            : 'text-slate-400 hover:bg-slate-50 hover:text-brand-celeste'
+                            }`}
+                        >
+                          <item.icon size={20} className={isActive ? 'animate-pulse' : ''} />
+                          <span className="font-bold text-sm tracking-tight">{item.label}</span>
+                        </button>
+                      );
+                    })}
+                  </nav>
 
-          <div className="p-6">
-            <button
-              onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-5 py-4 text-slate-400 hover:text-rose-500 rounded-2xl transition-all hover:bg-rose-50"
-            >
-              <LogOut size={20} />
-              <span className="font-bold text-sm">Cerrar Sesión</span>
-            </button>
-          </div>
-        </div>
-      </aside>
+                  <div className="p-6">
+                    <button
+                      onClick={handleLogout}
+                      className="w-full flex items-center gap-3 px-6 py-4 text-slate-400 hover:text-rose-500 rounded-2xl transition-all hover:bg-rose-50 border border-transparent hover:border-rose-100 group"
+                    >
+                      <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
+                      <span className="font-bold text-sm">Cerrar Sesión</span>
+                    </button>
+                  </div>
+                </div>
+              </aside>
 
-      <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-5 flex items-center justify-between z-30 print:hidden">
-          <button className="lg:hidden p-2 text-slate-400" onClick={() => setIsSidebarOpen(true)}>
-            <Menu size={24} />
-          </button>
+              <main className="flex-1 flex flex-col h-screen overflow-hidden">
+                <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-8 py-5 flex items-center justify-between z-30 print:hidden shadow-sm">
+                  <button className="lg:hidden p-2 text-slate-400 hover:bg-slate-50 rounded-xl transition-colors" onClick={() => setIsSidebarOpen(true)}>
+                    <Menu size={24} />
+                  </button>
 
-          <div className="flex items-center gap-3">
-            <CalendarCheck className="text-brand-celeste" size={20} />
-            <span className="text-sm font-black text-slate-700 tracking-tighter">
-              {getFormattedDate()}
-            </span>
-          </div>
+                  <div className="flex items-center gap-4 bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
+                    <CalendarCheck className="text-brand-celeste" size={18} />
+                    <span className="text-sm font-black text-slate-700 tracking-tight">
+                      {getFormattedDate()}
+                    </span>
+                  </div>
 
-          <div className="flex items-center gap-4">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-black text-slate-800 leading-none">{currentUser?.name || 'Usuario'}</p>
-              <p className="text-[10px] text-brand-celeste font-bold">{currentUser?.role.toUpperCase() || 'S/R'}</p>
+                  <div className="flex items-center gap-4 group">
+                    <div className="text-right hidden sm:block">
+                      <p className="text-xs font-black text-slate-800 leading-none mb-1">{currentUser?.name || 'Usuario'}</p>
+                      <p className="text-[10px] text-brand-celeste font-bold tracking-wider">{currentUser?.role.toUpperCase() || 'INVITADO'}</p>
+                    </div>
+                    <div className="w-11 h-11 rounded-2xl bg-slate-50 border-2 border-brand-celeste flex items-center justify-center text-brand-celeste shadow-sm transition-transform group-hover:scale-105">
+                      <UserCircle2 size={26} />
+                    </div>
+                  </div>
+                </header>
+
+                <div className="flex-1 overflow-y-auto bg-slate-50/50 print:bg-white print:overflow-visible">
+                  <Routes>
+                    <Route path="/" element={
+                      <Dashboard
+                        user={currentUser}
+                        onSelectClassroom={(c) => {
+                          setSelectedClassroom(c);
+                          navigate('/asistencia');
+                        }}
+                      />
+                    } />
+                    <Route path="/asistencia" element={
+                      selectedClassroom ? (
+                        <AttendanceSheet
+                          classroom={selectedClassroom}
+                          userId={currentUser?.id}
+                          userName={currentUser?.name}
+                          onBack={() => navigate('/')}
+                          onViewReport={() => navigate('/reporte-bimestral')}
+                          showToast={showToast}
+                        />
+                      ) : <Navigate to="/" replace />
+                    } />
+                    <Route path="/asistencias" element={<Navigate to="/" replace />} />
+                    <Route path="/reporte-bimestral" element={
+                      selectedClassroom ? (
+                        <BimesterReport
+                          classroom={selectedClassroom}
+                          onBack={() => navigate('/asistencia')}
+                        />
+                      ) : <Navigate to="/" replace />
+                    } />
+                    <Route path="/reportes" element={
+                      <Reports
+                        user={currentUser}
+                        onSelectClassroom={(classroom, date, range, endDate) => {
+                          setSelectedClassroom(classroom);
+                          setReportConfig({ date, range, endDate });
+                          navigate('/reporte-detalle');
+                        }}
+                        onViewMeetingReports={() => navigate('/reportes-reuniones')}
+                      />
+                    } />
+                    <Route path="/gestion" element={<Management showToast={showToast} />} />
+                    <Route path="/reporte-detalle" element={
+                      selectedClassroom ? (
+                        <ClassroomReportDetail
+                          classroom={selectedClassroom}
+                          date={reportConfig.date}
+                          range={reportConfig.range}
+                          endDate={reportConfig.endDate}
+                          onBack={() => navigate('/reportes')}
+                        />
+                      ) : <Navigate to="/reportes" replace />
+                    } />
+                    <Route path="/reportes-reuniones" element={
+                      <MeetingReports
+                        user={currentUser}
+                        onBack={() => navigate('/reportes')}
+                        onViewDetail={(meeting) => {
+                          setSelectedMeeting(meeting);
+                          navigate('/detalle-reunion');
+                        }}
+                      />
+                    } />
+                    <Route path="/reuniones" element={
+                      <Meetings
+                        user={currentUser}
+                        showToast={showToast}
+                        onCreateMeeting={(classroom, meetingId, meetingTitle) => {
+                          setSelectedClassroom(classroom);
+                          setSelectedMeeting({
+                            id: meetingId,
+                            title: meetingTitle,
+                            date: new Date().toISOString().split('T')[0],
+                            classroom_id: classroom.id,
+                            classroom_name: classroom.name,
+                            created_at: new Date().toISOString(),
+                            attendance_count: 0,
+                            total_students: 0
+                          });
+                          navigate('/asistencia-reunion');
+                        }}
+                        onViewMeetingDetail={(meeting) => {
+                          setSelectedMeeting(meeting);
+                          navigate('/detalle-reunion');
+                        }}
+                      />
+                    } />
+                    <Route path="/asistencia-reunion" element={
+                      selectedClassroom && selectedMeeting ? (
+                        <MeetingAttendanceSheet
+                          classroom={selectedClassroom}
+                          meetingId={selectedMeeting.id}
+                          meetingTitle={selectedMeeting.title}
+                          onBack={() => navigate('/reuniones')}
+                          showToast={showToast}
+                        />
+                      ) : <Navigate to="/reuniones" replace />
+                    } />
+                    <Route path="/detalle-reunion" element={
+                      selectedMeeting ? (
+                        <MeetingDetail
+                          meeting={selectedMeeting}
+                          onBack={() => navigate(-1)}
+                          onEditAttendance={(meeting) => {
+                            setSelectedMeeting(meeting);
+                            const classroom = {
+                              id: meeting.classroom_id,
+                              name: meeting.classroom_name,
+                              level: 'Primaria' as any,
+                              studentCount: 0
+                            };
+                            setSelectedClassroom(classroom as Classroom);
+                            navigate('/asistencia-reunion');
+                          }}
+                        />
+                      ) : <Navigate to="/reuniones" replace />
+                    } />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </div>
+
+                {/* Floating Toast Notification */}
+                {toast.visible && (
+                  <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 duration-300">
+                    <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' :
+                      toast.type === 'error' ? 'bg-rose-500 border-rose-400 text-white' :
+                        'bg-slate-800 border-slate-700 text-white'
+                      }`}>
+                      {toast.type === 'success' && <CheckCircle2 size={20} />}
+                      {toast.type === 'error' && <XCircle size={20} />}
+                      {toast.type === 'info' && <AlertCircle size={20} />}
+                      <span className="font-black text-sm tracking-tight">{toast.message}</span>
+                    </div>
+                  </div>
+                )}
+              </main>
             </div>
-            <div className="w-10 h-10 rounded-2xl bg-slate-50 border-2 border-brand-celeste flex items-center justify-center text-brand-celeste shadow-sm">
-              <UserCircle2 size={24} />
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 overflow-y-auto bg-slate-50 print:bg-white print:overflow-visible">
-          {currentView === 'DASHBOARD' && (
-            <Dashboard
-              user={currentUser}
-              onSelectClassroom={(c) => {
-                setSelectedClassroom(c);
-                setCurrentView('ATTENDANCE_SHEET');
-              }}
-            />
-          )}
-          {currentView === 'ATTENDANCE_SHEET' && selectedClassroom && (
-            <AttendanceSheet
-              classroom={selectedClassroom}
-              userId={currentUser?.id}
-              userName={currentUser?.name}
-              onBack={() => setCurrentView('DASHBOARD')}
-              onViewReport={() => setCurrentView('BIMESTER_REPORT')}
-              showToast={showToast}
-            />
-          )}
-          {currentView === 'BIMESTER_REPORT' && selectedClassroom && (
-            <BimesterReport
-              classroom={selectedClassroom}
-              onBack={() => setCurrentView('ATTENDANCE_SHEET')}
-            />
-          )}
-          {currentView === 'REPORTS' && currentUser && (
-            <Reports
-              user={currentUser}
-              onSelectClassroom={handleOpenClassroomReport}
-              onViewMeetingReports={() => {
-                setMeetingReturnView('MEETING_REPORTS');
-                setCurrentView('MEETING_REPORTS');
-              }}
-            />
-          )}
-          {currentView === 'MANAGEMENT' && (
-            <Management showToast={showToast} />
-          )}
-          {currentView === 'CLASSROOM_REPORT_DETAIL' && selectedClassroom && (
-            <ClassroomReportDetail
-              classroom={selectedClassroom}
-              date={reportConfig.date}
-              range={reportConfig.range}
-              endDate={reportConfig.endDate}
-              onBack={() => setCurrentView('REPORTS')}
-            />
-          )}
-          {currentView === 'MEETING_REPORTS' && currentUser && (
-            <MeetingReports
-              user={currentUser}
-              onBack={() => setCurrentView('REPORTS')}
-              onViewDetail={(meeting) => {
-                setSelectedMeeting(meeting);
-                setMeetingReturnView('MEETING_REPORTS');
-                setCurrentView('MEETING_DETAIL');
-              }}
-            />
-          )}
-          {currentView === 'MEETINGS' && currentUser && (
-            <Meetings
-              user={currentUser}
-              showToast={showToast}
-              onCreateMeeting={(classroom, meetingId, meetingTitle) => {
-                setSelectedClassroom(classroom);
-                setSelectedMeeting({
-                  id: meetingId,
-                  title: meetingTitle,
-                  date: new Date().toISOString().split('T')[0],
-                  classroom_id: classroom.id,
-                  classroom_name: classroom.name,
-                  created_at: new Date().toISOString(),
-                  attendance_count: 0,
-                  total_students: 0
-                });
-                setCurrentView('MEETING_ATTENDANCE_SHEET');
-              }}
-              onViewMeetingDetail={(meeting) => {
-                setSelectedMeeting(meeting);
-                setMeetingReturnView('MEETINGS');
-                setCurrentView('MEETING_DETAIL');
-              }}
-            />
-          )}
-          {currentView === 'MEETING_ATTENDANCE_SHEET' && selectedClassroom && selectedMeeting && (
-            <MeetingAttendanceSheet
-              classroom={selectedClassroom}
-              meetingId={selectedMeeting.id}
-              meetingTitle={selectedMeeting.title}
-              onBack={() => setCurrentView('MEETINGS')}
-              showToast={showToast}
-            />
-          )}
-          {currentView === 'MEETING_DETAIL' && selectedMeeting && (
-            <MeetingDetail
-              meeting={selectedMeeting}
-              onBack={() => setCurrentView(meetingReturnView)}
-              onEditAttendance={(meeting) => {
-                setSelectedMeeting(meeting);
-                // Also need to set classroom for the attendance sheet
-                const classroom = {
-                  id: meeting.classroom_id,
-                  name: meeting.classroom_name,
-                  level: 'Primaria', // Should really fetch actual level or store it
-                  studentCount: 0
-                };
-                setSelectedClassroom(classroom as Classroom);
-                setCurrentView('MEETING_ATTENDANCE_SHEET');
-              }}
-            />
-          )}
-        </div>
-
-        {/* Floating Toast Notification */}
-        {toast.visible && (
-          <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-5 duration-300">
-            <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 border ${toast.type === 'success' ? 'bg-emerald-500 border-emerald-400 text-white' :
-              toast.type === 'error' ? 'bg-rose-500 border-rose-400 text-white' :
-                'bg-slate-800 border-slate-700 text-white'
-              }`}>
-              {toast.type === 'success' && <CheckCircle2 size={20} />}
-              {toast.type === 'error' && <XCircle size={20} />}
-              {toast.type === 'info' && <AlertCircle size={20} />}
-              <span className="font-black text-sm tracking-tight">{toast.message}</span>
-            </div>
-          </div>
-        )}
-      </main>
-    </div>
+          </RequireAuth>
+        }
+      />
+    </Routes>
   );
 };
 
