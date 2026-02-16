@@ -7,7 +7,9 @@ interface RequireAuthProps {
     allowedRoles?: string[];
 }
 
-export const RequireAuth = ({ children, allowedRoles = ['ADMIN', 'SUBDIRECTOR', 'SUPERVISOR', 'SECRETARIA', 'DOCENTE', 'AUXILIAR'] }: RequireAuthProps) => {
+const DEFAULT_ALLOWED_ROLES = ['ADMIN', 'SUBDIRECTOR', 'SUPERVISOR', 'SECRETARIA', 'DOCENTE', 'AUXILIAR'];
+
+export const RequireAuth = ({ children, allowedRoles = DEFAULT_ALLOWED_ROLES }: RequireAuthProps) => {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
     const [session, setSession] = useState<any>(null);
