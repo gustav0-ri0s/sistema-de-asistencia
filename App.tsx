@@ -17,7 +17,8 @@ import {
   CalendarDays,
   CheckCircle2,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Home
 } from 'lucide-react';
 import { Classroom, StaffMember, UserRole, Meeting } from './types.ts';
 import Dashboard from './components/Dashboard.tsx';
@@ -200,7 +201,14 @@ const App: React.FC = () => {
                     })}
                   </nav>
 
-                  <div className="p-6">
+                  <div className="p-6 space-y-2">
+                    <button
+                      onClick={() => window.location.href = import.meta.env.VITE_PORTAL_URL || '/'}
+                      className="w-full flex items-center gap-3 px-6 py-4 text-slate-400 hover:text-brand-celeste rounded-2xl transition-all hover:bg-slate-50 border border-transparent hover:border-slate-100 group"
+                    >
+                      <Home size={20} className="group-hover:scale-110 transition-transform" />
+                      <span className="font-bold text-sm">Volver al Portal</span>
+                    </button>
                     <button
                       onClick={handleLogout}
                       className="w-full flex items-center gap-3 px-6 py-4 text-slate-400 hover:text-rose-500 rounded-2xl transition-all hover:bg-rose-50 border border-transparent hover:border-rose-100 group"
