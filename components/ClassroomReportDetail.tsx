@@ -40,7 +40,7 @@ const ClassroomReportDetail: React.FC<ClassroomReportDetailProps> = ({ classroom
         id: s.id,
         name: `${s.last_name}, ${s.first_name}`,
         dni: s.dni || '---',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.first_name + ' ' + s.last_name)}&background=random&color=fff&rounded=true&bold=true`
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.first_name + ' ' + s.last_name.split(' ')[0])}&background=random&color=fff&rounded=true&bold=true`
       }));
 
       setStudents(mappedStudents);
