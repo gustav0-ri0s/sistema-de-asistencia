@@ -15,49 +15,48 @@ export const RequireAuth = ({ children, allowedRoles = ['ADMIN', 'SUBDIRECTOR', 
     const portalUrl = import.meta.env.VITE_PORTAL_URL;
 
     useEffect(() => {
+        let isMounted = true;
+
         const checkAuth = async () => {
             try {
-                const { data: { session } } = await supabase.auth.getSession();
+                const { data: { session: currentSession }, error: sessionError } = await supabase.auth.getSession();
 
-                if (!session) {
+                if (!isMounted) return;
+
+                if (sessionError || !currentSession) {
                     const returnTo = encodeURIComponent(window.location.href);
                     window.location.href = `${portalUrl}/login?returnTo=${returnTo}`;
                     return;
                 }
 
-                setSession(session);
+                setSession(currentSession);
 
-                // Check profile and role
-                const { data: profile, error } = await supabase
+                const { data: profile, error: profileError } = await supabase
                     .from('profiles')
                     .select('role')
-                    .eq('id', session.user.id)
+                    .eq('id', currentSession.user.id)
                     .single();
 
-                if (error || !profile) {
-                    console.error('Error fetching profile:', error);
+                if (!isMounted) return;
+
+                if (profileError || !profile) {
+                    console.error('Error fetching profile:', profileError);
                     setAuthorized(false);
                 } else {
-                    // Check if user role is in allowedRoles
-                    // Normalize to uppercase and trim for comparison
                     const userRole = profile.role?.toUpperCase().trim();
                     const isAuthorized = allowedRoles.includes(userRole);
-
-                    console.log('User Role found:', userRole);
-                    console.log('Allowed Roles:', allowedRoles);
-                    console.log('Is Authorized:', isAuthorized);
-
                     setAuthorized(isAuthorized);
                 }
             } catch (error) {
                 console.error('Auth check error:', error);
-                setAuthorized(false);
+                if (isMounted) setAuthorized(false);
             } finally {
-                setLoading(false);
+                if (isMounted) setLoading(false);
             }
         };
 
         checkAuth();
+        return () => { isMounted = false; };
     }, [allowedRoles, portalUrl]);
 
     const handleSignOut = async () => {
