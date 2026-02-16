@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { ShieldAlert, LogOut } from 'lucide-react';
 
@@ -7,7 +7,7 @@ interface RequireAuthProps {
     allowedRoles?: string[];
 }
 
-export const RequireAuth = ({ children, allowedRoles = ['ADMIN', 'SUBDIRECTOR', 'SUPERVISOR', 'SECRETARIA'] }: RequireAuthProps) => {
+export const RequireAuth = ({ children, allowedRoles = ['ADMIN', 'SUBDIRECTOR', 'SUPERVISOR', 'SECRETARIA', 'DOCENTE', 'AUXILIAR'] }: RequireAuthProps) => {
     const [loading, setLoading] = useState(true);
     const [authorized, setAuthorized] = useState(false);
     const [session, setSession] = useState<any>(null);
@@ -39,9 +39,14 @@ export const RequireAuth = ({ children, allowedRoles = ['ADMIN', 'SUBDIRECTOR', 
                     setAuthorized(false);
                 } else {
                     // Check if user role is in allowedRoles
-                    // Normalize to uppercase for comparison
-                    const userRole = profile.role?.toUpperCase();
+                    // Normalize to uppercase and trim for comparison
+                    const userRole = profile.role?.toUpperCase().trim();
                     const isAuthorized = allowedRoles.includes(userRole);
+
+                    console.log('User Role found:', userRole);
+                    console.log('Allowed Roles:', allowedRoles);
+                    console.log('Is Authorized:', isAuthorized);
+
                     setAuthorized(isAuthorized);
                 }
             } catch (error) {
