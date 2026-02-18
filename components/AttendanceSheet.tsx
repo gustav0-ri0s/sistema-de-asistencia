@@ -756,21 +756,21 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
         <button
           onClick={saveAttendance}
           disabled={saving}
-          className={`w-full py-5 rounded-[2rem] font-black text-sm tracking-[0.1em] shadow-2xl flex items-center justify-center gap-3 transition-all border-4 border-white disabled:opacity-70 disabled:cursor-not-allowed ${isToday
-            ? 'bg-slate-800 text-white hover:bg-slate-900'
-            : 'bg-gradient-to-r from-brand-celeste to-cyan-500 text-white hover:from-cyan-500 hover:to-brand-celeste'
+          className={`w-full py-5 rounded-[2rem] font-black text-sm tracking-[0.1em] shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-70 disabled:cursor-not-allowed ${isToday
+              ? 'bg-brand-celeste text-white hover:bg-cyan-600 shadow-cyan-200'
+              : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
             }`}
         >
           {saving ? (
             <Loader2 className="animate-spin text-white" size={20} />
           ) : (
-            <CalendarCheck size={20} className={isToday ? 'text-brand-celeste' : 'text-white'} />
+            <CalendarCheck size={20} className="text-white" />
           )}
           {saving
             ? 'GUARDANDO...'
             : isToday
               ? 'FINALIZAR ASISTENCIA DE HOY'
-              : `GUARDAR ASISTENCIA — ${formatDateDisplay(selectedDate).toUpperCase()}`
+              : `GUARDAR CAMBIOS — ${formatDateDisplay(selectedDate).toUpperCase()}`
           }
         </button>
       </div>

@@ -687,8 +687,8 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                                                         <div
                                                             onClick={() => handleToggleRole(student.id, 'padre')}
                                                             className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${(record.familyMember === 'padre' || record.familyMember === 'ambos')
-                                                                    ? 'bg-blue-500 border-blue-500 shadow-sm'
-                                                                    : 'border-slate-300 bg-white group-hover:border-blue-400'
+                                                                ? 'bg-blue-500 border-blue-500 shadow-sm'
+                                                                : 'border-slate-300 bg-white group-hover:border-blue-400'
                                                                 }`}
                                                         >
                                                             {(record.familyMember === 'padre' || record.familyMember === 'ambos') && <Check size={12} className="text-white stroke-[4]" />}
@@ -701,8 +701,8 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                                                         <div
                                                             onClick={() => handleToggleRole(student.id, 'madre')}
                                                             className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${(record.familyMember === 'madre' || record.familyMember === 'ambos')
-                                                                    ? 'bg-pink-500 border-pink-500 shadow-sm'
-                                                                    : 'border-slate-300 bg-white group-hover:border-pink-400'
+                                                                ? 'bg-pink-500 border-pink-500 shadow-sm'
+                                                                : 'border-slate-300 bg-white group-hover:border-pink-400'
                                                                 }`}
                                                         >
                                                             {(record.familyMember === 'madre' || record.familyMember === 'ambos') && <Check size={12} className="text-white stroke-[4]" />}
@@ -715,8 +715,8 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                                                         <div
                                                             onClick={() => handleToggleRole(student.id, 'otro_familiar')}
                                                             className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${record.familyMember === 'otro_familiar'
-                                                                    ? 'bg-purple-500 border-purple-500 shadow-sm'
-                                                                    : 'border-slate-300 bg-white group-hover:border-purple-400'
+                                                                ? 'bg-purple-500 border-purple-500 shadow-sm'
+                                                                : 'border-slate-300 bg-white group-hover:border-purple-400'
                                                                 }`}
                                                         >
                                                             {record.familyMember === 'otro_familiar' && <Check size={12} className="text-white stroke-[4]" />}
@@ -758,15 +758,17 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                     <button
                         onClick={saveAttendance}
                         disabled={saving}
-                        className={`w-full py-5 rounded-[2rem] font-black text-sm tracking-[0.1em] shadow-2xl flex items-center justify-center gap-3 transition-all border-4 border-white disabled:opacity-70 ${isToday ? 'bg-slate-800 text-white hover:bg-slate-900' : 'bg-gradient-to-r from-brand-celeste to-cyan-500 text-white'
+                        className={`w-full py-5 rounded-[2rem] font-black text-sm tracking-[0.1em] shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-70 ${isToday
+                                ? 'bg-brand-celeste text-white hover:bg-cyan-600 shadow-cyan-200'
+                                : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
                             }`}
                     >
                         {saving ? (
                             <Loader2 className="animate-spin text-white" size={20} />
                         ) : (
-                            <Save size={20} className={isToday ? 'text-brand-celeste' : 'text-white'} />
+                            <Save size={20} className="text-white" />
                         )}
-                        {saving ? 'GUARDANDO...' : isToday ? `GUARDAR ASISTENCIA DE REUNIÓN (${attendedCount})` : `GUARDAR ASISTENCIA — ${formatDateDisplay(selectedDate).toUpperCase()}`}
+                        {saving ? 'GUARDANDO...' : isToday ? `GUARDAR ASISTENCIA DE REUNIÓN (${attendedCount})` : `GUARDAR CAMBIOS — ${formatDateDisplay(selectedDate).toUpperCase()}`}
                     </button>
                 </div>
             )}
