@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Classroom, StaffMember, Meeting } from '../types';
+import { Classroom, StaffMember, Meeting, FamilyMemberType } from '../types';
 import {
     Calendar,
     ArrowLeft,
@@ -10,7 +10,11 @@ import {
     Loader2,
     ChevronRight,
     TrendingUp,
-    FileText
+    FileText,
+    Filter,
+    PieChart,
+    Building2,
+    Award
 } from 'lucide-react';
 
 interface MeetingReportsProps {
@@ -19,31 +23,90 @@ interface MeetingReportsProps {
     onViewDetail: (meeting: Meeting) => void;
 }
 
+interface ConsolidatedStats {
+    totalMeetings: number;
+    totalStudents: number;
+    attendedCount: number;
+    fatherCount: number;
+    motherCount: number;
+    bothCount: number;
+    otherCount: number;
+    attendancePercentage: number;
+}
+
 const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDetail }) => {
     const [meetings, setMeetings] = useState<Meeting[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [view, setView] = useState<'LIST' | 'CONSOLIDATED'>('LIST');
+
+    // Filters for consolidated report
+    const [filterLevel, setFilterLevel] = useState<string>('all');
+    const [filterClassroom, setFilterClassroom] = useState<string>('all');
+    const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+    const [consolidatedStats, setConsolidatedStats] = useState<ConsolidatedStats | null>(null);
 
     useEffect(() => {
-        fetchMeetings();
-    }, [user]);
+        fetchData();
+    }, [user, filterLevel, filterClassroom]);
+
+    const fetchData = async () => {
+        setLoading(true);
+        await Promise.all([
+            fetchMeetings(),
+            fetchClassrooms()
+        ]);
+        setLoading(false);
+    };
+
+    const fetchClassrooms = async () => {
+        try {
+            let query = supabase.from('classrooms').select('*').eq('active', true);
+
+            if (user.role !== 'Administrador' && user.role !== 'Supervisor') {
+                const assignedIds = user.assignments.map(a => a.classroomId).filter(Boolean);
+                if (assignedIds.length > 0) {
+                    query = query.in('id', assignedIds.map(id => parseInt(id!)));
+                } else {
+                    setClassrooms([]);
+                    return;
+                }
+            } else if (filterLevel !== 'all') {
+                query = query.eq('level', filterLevel);
+            }
+
+            const { data, error } = await query.order('name', { ascending: true });
+            if (error) throw error;
+            setClassrooms(data.map((c: any) => ({
+                id: c.id.toString(),
+                name: c.name,
+                level: c.level,
+                studentCount: c.capacity || 0
+            })));
+        } catch (err) {
+            console.error('Error fetching classrooms:', err);
+        }
+    };
 
     const fetchMeetings = async () => {
         try {
-            setLoading(true);
+            let selectStr = `
+                id,
+                title,
+                date,
+                classroom_id,
+                created_at,
+                classrooms${filterLevel !== 'all' && (user.role === 'Administrador' || user.role === 'Supervisor') ? '!inner' : ''} (
+                    id,
+                    name,
+                    level,
+                    grade
+                )
+            `;
+
             let query = supabase
                 .from('meetings')
-                .select(`
-                    id,
-                    title,
-                    date,
-                    classroom_id,
-                    created_at,
-                    classrooms (
-                        name,
-                        level
-                    )
-                `);
+                .select(selectStr);
 
             if (user.role !== 'Administrador' && user.role !== 'Supervisor') {
                 const assignedClassroomIds = user.assignments.map(a => a.classroomId).filter(Boolean);
@@ -51,8 +114,14 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
                     query = query.in('classroom_id', assignedClassroomIds.map(id => parseInt(id!)));
                 } else {
                     setMeetings([]);
-                    setLoading(false);
                     return;
+                }
+            } else {
+                if (filterLevel !== 'all') {
+                    query = query.eq('classrooms.level', filterLevel);
+                }
+                if (filterClassroom !== 'all') {
+                    query = query.eq('classroom_id', parseInt(filterClassroom));
                 }
             }
 
@@ -60,17 +129,42 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
 
             if (error) throw error;
 
+            // Helper to handle the filtered data (if classroom level filter was applied joinedly)
+            const filteredData = data.filter((m: any) => m.classrooms !== null);
+
+            let totalAtt = 0;
+            let totalStud = 0;
+            let totalFathers = 0;
+            let totalMothers = 0;
+            let totalBoth = 0;
+            let totalOthers = 0;
+
             const meetingsWithCounts = await Promise.all(
-                data.map(async (meeting: any) => {
-                    const { count: attendanceCount } = await supabase
+                filteredData.map(async (meeting: any) => {
+                    const { data: attendanceData } = await supabase
                         .from('meeting_attendance')
-                        .select('*', { count: 'exact', head: true })
+                        .select('family_member_type')
                         .eq('meeting_id', meeting.id);
 
                     const { count: totalStudents } = await supabase
                         .from('students')
                         .select('*', { count: 'exact', head: true })
                         .eq('classroom_id', meeting.classroom_id);
+
+                    const attData = attendanceData || [];
+                    const attCount = attData.length;
+                    const studCount = totalStudents || 0;
+
+                    // Aggregate for consolidated
+                    totalAtt += attCount;
+                    totalStud += studCount;
+
+                    attData.forEach((a: any) => {
+                        if (a.family_member_type === 'padre') totalFathers++;
+                        else if (a.family_member_type === 'madre') totalMothers++;
+                        else if (a.family_member_type === 'ambos') totalBoth++;
+                        else if (a.family_member_type === 'otro_familiar') totalOthers++;
+                    });
 
                     return {
                         id: meeting.id,
@@ -79,17 +173,27 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
                         classroom_id: meeting.classroom_id,
                         classroom_name: meeting.classrooms?.name || 'Sin aula',
                         created_at: meeting.created_at,
-                        attendance_count: attendanceCount || 0,
-                        total_students: totalStudents || 0
+                        attendance_count: attCount,
+                        total_students: studCount
                     };
                 })
             );
 
             setMeetings(meetingsWithCounts);
+
+            setConsolidatedStats({
+                totalMeetings: filteredData.length,
+                totalStudents: totalStud,
+                attendedCount: totalAtt,
+                fatherCount: totalFathers,
+                motherCount: totalMothers,
+                bothCount: totalBoth,
+                otherCount: totalOthers,
+                attendancePercentage: totalStud > 0 ? Math.round((totalAtt / totalStud) * 100) : 0
+            });
+
         } catch (err) {
             console.error('Error fetching meetings for reports:', err);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -121,48 +225,108 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
                         </p>
                     </div>
                 </div>
-                <button
-                    onClick={handlePrint}
-                    className="flex items-center gap-3 px-7 py-4 bg-slate-800 text-white rounded-2xl text-xs font-black shadow-xl hover:bg-slate-900 transition-all tracking-widest"
-                >
-                    <Printer size={18} className="text-brand-celeste" />
-                    IMPRIMIR REPORTE
-                </button>
+                <div className="flex items-center gap-2">
+                    <div className="bg-slate-50 p-1.5 rounded-2xl border border-slate-100 flex items-center">
+                        <button
+                            onClick={() => setView('LIST')}
+                            className={`px-4 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${view === 'LIST' ? 'bg-white text-brand-celeste shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            REUNIONES
+                        </button>
+                        <button
+                            onClick={() => setView('CONSOLIDATED')}
+                            className={`px-4 py-2.5 rounded-xl text-[10px] font-black tracking-widest transition-all ${view === 'CONSOLIDATED' ? 'bg-white text-brand-celeste shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+                        >
+                            CONSOLIDADO
+                        </button>
+                    </div>
+                    <button
+                        onClick={handlePrint}
+                        className="flex items-center gap-3 px-6 py-4 bg-slate-800 text-white rounded-2xl text-[10px] font-black shadow-xl hover:bg-slate-900 transition-all tracking-widest"
+                    >
+                        <Printer size={18} className="text-brand-celeste" />
+                        IMPRIMIR
+                    </button>
+                </div>
             </div>
 
             {/* Print Only Header */}
             <div className="hidden print:flex flex-col items-center justify-center bg-slate-800 text-white py-10 px-8 mb-8 rounded-b-[2rem]">
                 <h1 className="text-2xl font-black mb-1">I.E.P. VALORES Y CIENCIAS</h1>
                 <h2 className="text-sm font-bold opacity-80 uppercase tracking-[0.2em]">Reporte Consolidado de Reuniones</h2>
-                <p className="text-[10px] mt-2 opacity-60">Fecha de Emisión: {new Date().toLocaleDateString('es-PE')}</p>
-            </div>
-
-            {/* Search and Stats */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden">
-                <div className="relative w-full sm:w-80">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Buscar reunión o aula..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full bg-white border border-slate-100 rounded-2xl pl-12 pr-4 py-3 text-sm font-medium focus:ring-2 focus:ring-brand-celeste outline-none shadow-sm transition-all"
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 bg-white px-5 py-3 rounded-2xl border border-slate-50 shadow-sm text-slate-500 font-bold text-xs uppercase tracking-wider">
-                    <FileText size={16} className="text-brand-celeste" />
-                    Total Reuniones: {filteredMeetings.length}
+                <div className="flex gap-4 mt-2 text-[10px] opacity-60">
+                    <p>Filtro: {filterLevel === 'all' ? 'Institucional' : filterLevel.toUpperCase()}</p>
+                    <p>Aula: {filterClassroom === 'all' ? 'Todas' : classrooms.find(c => c.id === filterClassroom)?.name}</p>
+                    <p>Fecha de Emisión: {new Date().toLocaleDateString('es-PE')}</p>
                 </div>
             </div>
 
-            {/* Grid of Meeting Reports */}
+            {/* Filters */}
+            <div className="bg-white rounded-[2rem] p-6 border border-slate-50 shadow-sm print:hidden">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                    {(user.role === 'Administrador' || user.role === 'Supervisor') && (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                    <Building2 size={12} /> Nivel Educativo
+                                </label>
+                                <select
+                                    value={filterLevel}
+                                    onChange={(e) => {
+                                        setFilterLevel(e.target.value);
+                                        setFilterClassroom('all');
+                                    }}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-celeste shadow-inner"
+                                >
+                                    <option value="all">TODOS LOS NIVELES</option>
+                                    <option value="inicial">INICIAL</option>
+                                    <option value="primaria">PRIMARIA</option>
+                                    <option value="secundaria">SECUNDARIA</option>
+                                </select>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 flex items-center gap-2">
+                                    <Filter size={12} /> Aula / Grado
+                                </label>
+                                <select
+                                    value={filterClassroom}
+                                    onChange={(e) => setFilterClassroom(e.target.value)}
+                                    className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-celeste shadow-inner"
+                                >
+                                    <option value="all">TODAS LAS AULAS</option>
+                                    {classrooms.map(c => (
+                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </>
+                    )}
+
+                    <div className="space-y-2 md:col-start-4">
+                        <label className="text-[10px] font-black text-slate-300 uppercase tracking-widest ml-1 flex items-center gap-2">
+                            <Search size={12} /> Buscar
+                        </label>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={14} />
+                            <input
+                                type="text"
+                                placeholder="Título reunión..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-xl pl-9 pr-4 py-3 text-xs font-bold text-slate-600 outline-none focus:ring-2 focus:ring-brand-celeste shadow-inner"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {loading ? (
                 <div className="flex flex-col items-center justify-center p-20 gap-4">
                     <Loader2 className="animate-spin text-brand-celeste" size={48} />
-                    <p className="text-slate-400 font-bold">Cargando reportes...</p>
+                    <p className="text-slate-400 font-bold">Generando informes...</p>
                 </div>
-            ) : (
+            ) : view === 'LIST' ? (
+                /* Individual Meetings View */
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {filteredMeetings.map((meeting) => {
                         const percentage = meeting.total_students > 0
@@ -228,9 +392,117 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
                         );
                     })}
                 </div>
+            ) : (
+                /* Consolidated Report View */
+                <div className="space-y-8 animate-in slide-in-from-bottom-5 duration-500">
+                    {/* Main Stats Row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-3">
+                            <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center">
+                                <Calendar size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Total Reuniones</p>
+                                <p className="text-3xl font-black text-slate-800">{consolidatedStats?.totalMeetings}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-3">
+                            <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-2xl flex items-center justify-center">
+                                <Users size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Asistencias Totales</p>
+                                <p className="text-3xl font-black text-slate-800">{consolidatedStats?.attendedCount}</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-3">
+                            <div className="w-12 h-12 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center">
+                                <TrendingUp size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">% Gral Asistencia</p>
+                                <p className="text-3xl font-black text-emerald-500">{consolidatedStats?.attendancePercentage}%</p>
+                            </div>
+                        </div>
+
+                        <div className="bg-white p-8 rounded-[2.5rem] border border-slate-50 shadow-sm space-y-3">
+                            <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center">
+                                <Award size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Meta Institucional</p>
+                                <p className="text-3xl font-black text-slate-800">95%</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Breakdown Chart-like area */}
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        <div className="lg:col-span-12 bg-slate-800 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                            <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+                                <div className="flex-1 space-y-8 w-full">
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                                            <PieChart size={24} className="text-brand-celeste" />
+                                        </div>
+                                        <h3 className="text-xl font-black tracking-tight italic">COMPOSICIÓN DE ASISTENCIA FAMILIAR</h3>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
+                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Padres</p>
+                                            <p className="text-4xl font-black text-white">{(consolidatedStats?.fatherCount || 0) + (consolidatedStats?.bothCount || 0)}</p>
+                                            <p className="text-[9px] text-white/60 font-medium mt-1">SÓLO + AMBOS</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
+                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Madres</p>
+                                            <p className="text-4xl font-black text-white">{(consolidatedStats?.motherCount || 0) + (consolidatedStats?.bothCount || 0)}</p>
+                                            <p className="text-[9px] text-white/60 font-medium mt-1">SÓLO + AMBOS</p>
+                                        </div>
+                                        <div className="bg-brand-celeste/20 p-6 rounded-3xl border border-brand-celeste/30 backdrop-blur-sm">
+                                            <p className="text-[10px] font-black text-brand-celeste uppercase tracking-widest mb-1">P y M Juntos</p>
+                                            <p className="text-4xl font-black text-white">{consolidatedStats?.bothCount}</p>
+                                            <p className="text-[9px] text-white/60 font-medium mt-1">FAMILIA COMPLETA</p>
+                                        </div>
+                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
+                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Otros</p>
+                                            <p className="text-4xl font-black text-white">{consolidatedStats?.otherCount}</p>
+                                            <p className="text-[9px] text-white/60 font-medium mt-1">APODERADOS / FAMILIARES</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress Comparison */}
+                                    <div className="space-y-4 pt-4 border-t border-white/10">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between text-[10px] font-black uppercase tracking-wider">
+                                                <span className="text-white/60">Distribución de Responsabilidad</span>
+                                                <span className="text-brand-celeste">{(consolidatedStats?.fatherCount || 0) + (consolidatedStats?.bothCount || 0)} Padres vs {(consolidatedStats?.motherCount || 0) + (consolidatedStats?.bothCount || 0)} Madres</span>
+                                            </div>
+                                            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden flex shadow-inner">
+                                                <div
+                                                    className="h-full bg-cyan-400"
+                                                    style={{ width: `${consolidatedStats?.attendedCount ? (((consolidatedStats.fatherCount + consolidatedStats.bothCount) / (Math.max(1, consolidatedStats.fatherCount + consolidatedStats.motherCount + consolidatedStats.bothCount * 2 + consolidatedStats.otherCount))) * 100) : 50}%` }}
+                                                ></div>
+                                                <div
+                                                    className="h-full bg-pink-400"
+                                                    style={{ width: `${consolidatedStats?.attendedCount ? (((consolidatedStats.motherCount + consolidatedStats.bothCount) / (Math.max(1, consolidatedStats.fatherCount + consolidatedStats.motherCount + consolidatedStats.bothCount * 2 + consolidatedStats.otherCount))) * 100) : 50}%` }}
+                                                ></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Decorative element */}
+                            <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-brand-celeste/20 rounded-full blur-3xl"></div>
+                        </div>
+                    </div>
+                </div>
             )}
 
-            {!loading && filteredMeetings.length === 0 && (
+            {!loading && filteredMeetings.length === 0 && view === 'LIST' && (
                 <div className="flex flex-col items-center justify-center p-20 text-slate-300 text-center">
                     <Calendar size={64} className="mb-4 opacity-10" />
                     <p className="font-bold">No se encontraron reuniones registradas.</p>

@@ -27,7 +27,8 @@ interface AttendanceDetail {
     student_id: string;
     student_name: string;
     student_dni: string;
-    family_member_type: 'padre' | 'madre' | 'otro_familiar' | null;
+    family_member_type: 'padre' | 'madre' | 'ambos' | 'otro_familiar' | null;
+    other_family_member_name: string | null;
     attended_at: string | null;
 }
 
@@ -79,6 +80,7 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({ meeting, onBack, onEditAt
                     student_name: `${student.last_name}, ${student.first_name}`,
                     student_dni: student.dni || '---',
                     family_member_type: attendanceRecord?.family_member_type || null,
+                    other_family_member_name: attendanceRecord?.other_family_member_name || null,
                     attended_at: attendanceRecord?.attended_at || null
                 };
             });
@@ -103,6 +105,7 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({ meeting, onBack, onEditAt
         const labels: Record<string, string> = {
             'padre': 'Padre',
             'madre': 'Madre',
+            'ambos': 'Ambos (P y M)',
             'otro_familiar': 'Otro Familiar'
         };
         return type ? labels[type] : '-';
@@ -112,6 +115,7 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({ meeting, onBack, onEditAt
         const colors: Record<string, string> = {
             'padre': 'bg-blue-100 text-blue-700',
             'madre': 'bg-pink-100 text-pink-700',
+            'ambos': 'bg-emerald-100 text-emerald-700',
             'otro_familiar': 'bg-purple-100 text-purple-700'
         };
         return type ? colors[type] : 'bg-slate-100 text-slate-400';
@@ -244,8 +248,15 @@ const MeetingDetail: React.FC<MeetingDetailProps> = ({ meeting, onBack, onEditAt
                                                 <p className="text-xs text-slate-500">DNI: {detail.student_dni}</p>
                                             </div>
                                         </div>
-                                        <div className={`px-4 py-2 rounded-lg text-xs font-bold ${getFamilyMemberColor(detail.family_member_type)}`}>
-                                            {getFamilyMemberLabel(detail.family_member_type)}
+                                        <div className="flex flex-col items-end gap-1">
+                                            <div className={`px-4 py-2 rounded-lg text-xs font-bold ${getFamilyMemberColor(detail.family_member_type)}`}>
+                                                {getFamilyMemberLabel(detail.family_member_type)}
+                                            </div>
+                                            {detail.family_member_type === 'otro_familiar' && detail.other_family_member_name && (
+                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">
+                                                    ({detail.other_family_member_name})
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 ))

@@ -6,6 +6,8 @@ export enum AttendanceStatus {
   JUSTIFIED = 'JUSTIFIED'
 }
 
+export type FamilyMemberType = 'padre' | 'madre' | 'ambos' | 'otro_familiar';
+
 export type Level = 'Inicial' | 'Primaria' | 'Secundaria';
 
 export type UserRole = 'Administrador' | 'Docente' | 'Auxiliar' | 'Supervisor' | 'Secretaria';

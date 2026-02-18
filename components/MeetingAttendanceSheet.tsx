@@ -12,7 +12,7 @@ import {
     CalendarCheck,
     Info
 } from 'lucide-react';
-import { Classroom, Student } from '../types';
+import { Classroom, Student, FamilyMemberType } from '../types';
 import { supabase } from '../lib/supabase';
 
 interface MeetingAttendanceSheetProps {
@@ -23,7 +23,6 @@ interface MeetingAttendanceSheetProps {
     showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
 }
 
-type FamilyMemberType = 'padre' | 'madre' | 'otro_familiar';
 
 interface AttendanceRecord {
     studentId: string;
@@ -659,6 +658,7 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                                                 >
                                                     <option value="padre">Padre</option>
                                                     <option value="madre">Madre</option>
+                                                    <option value="ambos">Ambos (P y M)</option>
                                                     <option value="otro_familiar">Otro Familiar</option>
                                                 </select>
                                             )}
