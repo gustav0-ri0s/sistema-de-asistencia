@@ -109,11 +109,21 @@ const App: React.FC = () => {
         .select('classroom_id')
         .eq('profile_id', userId);
 
+      const userAssignments = assignments?.map(a => ({ classroomId: a.classroom_id.toString() })) || [];
+
+      // Add tutor classroom if exists
+      if (profile.tutor_classroom_id) {
+        const tutorClassroomId = profile.tutor_classroom_id.toString();
+        if (!userAssignments.some(a => a.classroomId === tutorClassroomId)) {
+          userAssignments.push({ classroomId: tutorClassroomId });
+        }
+      }
+
       setCurrentUser({
         id: profile.id,
         name: profile.full_name,
         role: roleMap[profile.role] || 'Docente',
-        assignments: assignments?.map(a => ({ classroomId: a.classroom_id.toString() })) || []
+        assignments: userAssignments
       });
     } catch (err) {
       console.error('Error fetching profile:', err);

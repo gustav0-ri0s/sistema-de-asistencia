@@ -89,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({ user, onSelectClassroom }) => {
       }));
 
       // Filter by assignments
-      const filtered = user.role === 'Administrador'
+      const filtered = (user.role === 'Administrador' || user.role === 'Supervisor')
         ? mappedClassrooms
         : mappedClassrooms.filter(classroom =>
           user.assignments.some(assign =>
