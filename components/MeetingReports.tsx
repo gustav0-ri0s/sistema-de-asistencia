@@ -438,66 +438,132 @@ const MeetingReports: React.FC<MeetingReportsProps> = ({ user, onBack, onViewDet
                         </div>
                     </div>
 
-                    {/* Breakdown Chart-like area */}
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        <div className="lg:col-span-12 bg-slate-800 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
-                            <div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-                                <div className="flex-1 space-y-8 w-full">
-                                    <div className="flex items-center gap-4">
-                                        <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-                                            <PieChart size={24} className="text-brand-celeste" />
-                                        </div>
-                                        <h3 className="text-xl font-black tracking-tight italic">COMPOSICIÓN DE ASISTENCIA FAMILIAR</h3>
-                                    </div>
+                    {/* Composition Chart Section */}
+                    <div className="bg-slate-800 text-white p-10 rounded-[3rem] shadow-2xl relative overflow-hidden">
+                        <div className="relative z-10">
+                            <div className="flex items-center gap-4 mb-10">
+                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                                    <PieChart size={24} className="text-brand-celeste" />
+                                </div>
+                                <h3 className="text-xl font-black tracking-tight italic">COMPOSICIÓN DE ASISTENCIA FAMILIAR</h3>
+                            </div>
 
-                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
-                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Padres</p>
-                                            <p className="text-4xl font-black text-white">{(consolidatedStats?.fatherCount || 0) + (consolidatedStats?.bothCount || 0)}</p>
-                                            <p className="text-[9px] text-white/60 font-medium mt-1">SÓLO + AMBOS</p>
-                                        </div>
-                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
-                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Madres</p>
-                                            <p className="text-4xl font-black text-white">{(consolidatedStats?.motherCount || 0) + (consolidatedStats?.bothCount || 0)}</p>
-                                            <p className="text-[9px] text-white/60 font-medium mt-1">SÓLO + AMBOS</p>
-                                        </div>
-                                        <div className="bg-brand-celeste/20 p-6 rounded-3xl border border-brand-celeste/30 backdrop-blur-sm">
-                                            <p className="text-[10px] font-black text-brand-celeste uppercase tracking-widest mb-1">P y M Juntos</p>
-                                            <p className="text-4xl font-black text-white">{consolidatedStats?.bothCount}</p>
-                                            <p className="text-[9px] text-white/60 font-medium mt-1">FAMILIA COMPLETA</p>
-                                        </div>
-                                        <div className="bg-white/5 p-6 rounded-3xl border border-white/10 backdrop-blur-sm">
-                                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-1">Otros</p>
-                                            <p className="text-4xl font-black text-white">{consolidatedStats?.otherCount}</p>
-                                            <p className="text-[9px] text-white/60 font-medium mt-1">APODERADOS / FAMILIARES</p>
-                                        </div>
-                                    </div>
+                            <div className="flex flex-col lg:flex-row items-center justify-around gap-12">
+                                {/* SVG Donut Chart */}
+                                <div className="relative w-64 h-64 md:w-80 md:h-80 flex items-center justify-center">
+                                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                                        {(() => {
+                                            const stats = consolidatedStats;
+                                            if (!stats || stats.attendedCount === 0) return (
+                                                <circle cx="50" cy="50" r="40" fill="transparent" stroke="rgba(255,255,255,0.05)" strokeWidth="12" />
+                                            );
 
-                                    {/* Progress Comparison */}
-                                    <div className="space-y-4 pt-4 border-t border-white/10">
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-[10px] font-black uppercase tracking-wider">
-                                                <span className="text-white/60">Distribución de Responsabilidad</span>
-                                                <span className="text-brand-celeste">{(consolidatedStats?.fatherCount || 0) + (consolidatedStats?.bothCount || 0)} Padres vs {(consolidatedStats?.motherCount || 0) + (consolidatedStats?.bothCount || 0)} Madres</span>
+                                            const total = stats.attendedCount;
+                                            const fP = (stats.fatherCount / total) * 100;
+                                            const mP = (stats.motherCount / total) * 100;
+                                            const bP = (stats.bothCount / total) * 100;
+                                            const oP = (stats.otherCount / total) * 100;
+
+                                            let currentOffset = 0;
+                                            const radius = 40;
+                                            const circumference = 2 * Math.PI * radius;
+
+                                            const createSegment = (percent: number, color: string) => {
+                                                const strokeDash = (percent * circumference) / 100;
+                                                const offset = currentOffset;
+                                                currentOffset += strokeDash;
+                                                if (percent === 0) return null;
+                                                return (
+                                                    <circle
+                                                        cx="50" cy="50" r={radius}
+                                                        fill="transparent"
+                                                        stroke={color}
+                                                        strokeWidth="12"
+                                                        strokeDasharray={`${strokeDash} ${circumference - strokeDash}`}
+                                                        strokeDashoffset={-offset}
+                                                        strokeLinecap="round"
+                                                        className="transition-all duration-1000 ease-out"
+                                                    />
+                                                );
+                                            };
+
+                                            return (
+                                                <>
+                                                    {createSegment(fP, '#22d3ee')} {/* Cyan - Father */}
+                                                    {createSegment(mP, '#f472b6')} {/* Pink - Mother */}
+                                                    {createSegment(bP, '#10b981')} {/* Emerald - Both */}
+                                                    {createSegment(oP, '#a855f7')} {/* Purple - Others */}
+                                                </>
+                                            );
+                                        })()}
+                                    </svg>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                                        <p className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Total</p>
+                                        <p className="text-4xl md:text-5xl font-black">{consolidatedStats?.attendedCount}</p>
+                                        <p className="text-[10px] font-bold text-brand-celeste mt-1">ASISTENTES</p>
+                                    </div>
+                                </div>
+
+                                {/* Legend and Detailed Stats */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full max-w-lg">
+                                    <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-sm flex items-center gap-4 group hover:bg-white/10 transition-all">
+                                        <div className="w-3 h-12 bg-cyan-400 rounded-full shadow-[0_0_15px_rgba(34,211,238,0.5)]"></div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">SÓLO PADRES</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black">{consolidatedStats?.fatherCount}</span>
+                                                <span className="text-xs font-bold text-cyan-400">
+                                                    {consolidatedStats ? Math.round((consolidatedStats.fatherCount / Math.max(1, consolidatedStats.attendedCount)) * 100) : 0}%
+                                                </span>
                                             </div>
-                                            <div className="w-full h-3 bg-white/5 rounded-full overflow-hidden flex shadow-inner">
-                                                <div
-                                                    className="h-full bg-cyan-400"
-                                                    style={{ width: `${consolidatedStats?.attendedCount ? (((consolidatedStats.fatherCount + consolidatedStats.bothCount) / (Math.max(1, consolidatedStats.fatherCount + consolidatedStats.motherCount + consolidatedStats.bothCount * 2 + consolidatedStats.otherCount))) * 100) : 50}%` }}
-                                                ></div>
-                                                <div
-                                                    className="h-full bg-pink-400"
-                                                    style={{ width: `${consolidatedStats?.attendedCount ? (((consolidatedStats.motherCount + consolidatedStats.bothCount) / (Math.max(1, consolidatedStats.fatherCount + consolidatedStats.motherCount + consolidatedStats.bothCount * 2 + consolidatedStats.otherCount))) * 100) : 50}%` }}
-                                                ></div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-sm flex items-center gap-4 group hover:bg-white/10 transition-all">
+                                        <div className="w-3 h-12 bg-pink-400 rounded-full shadow-[0_0_15px_rgba(244,114,182,0.5)]"></div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">SÓLO MADRES</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black">{consolidatedStats?.motherCount}</span>
+                                                <span className="text-xs font-bold text-pink-400">
+                                                    {consolidatedStats ? Math.round((consolidatedStats.motherCount / Math.max(1, consolidatedStats.attendedCount)) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-sm flex items-center gap-4 group hover:bg-white/10 transition-all">
+                                        <div className="w-3 h-12 bg-emerald-500 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.5)]"></div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">AMBOS (P Y M)</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black">{consolidatedStats?.bothCount}</span>
+                                                <span className="text-xs font-bold text-emerald-400">
+                                                    {consolidatedStats ? Math.round((consolidatedStats.bothCount / Math.max(1, consolidatedStats.attendedCount)) * 100) : 0}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white/5 p-5 rounded-[2rem] border border-white/10 backdrop-blur-sm flex items-center gap-4 group hover:bg-white/10 transition-all">
+                                        <div className="w-3 h-12 bg-purple-500 rounded-full shadow-[0_0_15px_rgba(168,85,247,0.5)]"></div>
+                                        <div>
+                                            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none mb-1">OTROS FAMILIARES</p>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-2xl font-black">{consolidatedStats?.otherCount}</span>
+                                                <span className="text-xs font-bold text-purple-400">
+                                                    {consolidatedStats ? Math.round((consolidatedStats.otherCount / Math.max(1, consolidatedStats.attendedCount)) * 100) : 0}%
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-
-                            {/* Decorative element */}
-                            <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-brand-celeste/20 rounded-full blur-3xl"></div>
                         </div>
+
+                        {/* Decorative background glow */}
+                        <div className="absolute -right-20 -bottom-20 w-80 h-80 bg-brand-celeste/20 rounded-full blur-3xl"></div>
+                        <div className="absolute -left-20 -top-20 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"></div>
                     </div>
                 </div>
             )}
