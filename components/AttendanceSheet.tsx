@@ -39,6 +39,9 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [filledByInfo, setFilledByInfo] = useState<FilledByInfo | null>(null);
+  const [noteModalStudent, setNoteModalStudent] = useState<Student | null>(null);
+  const [tempNote, setTempNote] = useState('');
+  const [savingNote, setSavingNote] = useState(false);
 
   // Date navigation state
   const today = new Date().toISOString().split('T')[0];
@@ -243,6 +246,57 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
       if (showToast) showToast('Error al guardar asistencia: ' + err.message, 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const openNoteModal = (student: Student) => {
+    setNoteModalStudent(student);
+    setTempNote(notes[student.id] || '');
+  };
+
+  const handleSaveNote = async () => {
+    if (!noteModalStudent) return;
+
+    // Update local state first
+    setNotes(prev => ({ ...prev, [noteModalStudent.id]: tempNote }));
+
+    // If attendance is already marked for this student/date, we can save it to the DB immediately
+    const currentStatus = attendance[noteModalStudent.id];
+    if (currentStatus) {
+      try {
+        setSavingNote(true);
+        const statusMap: Record<string, number> = {
+          [AttendanceStatus.PRESENT]: 1,
+          [AttendanceStatus.LATE]: 2,
+          [AttendanceStatus.ABSENT]: 3,
+          [AttendanceStatus.JUSTIFIED]: 4
+        };
+
+        const { error } = await supabase
+          .from('attendance')
+          .upsert({
+            student_id: noteModalStudent.id,
+            classroom_id: classroom.id,
+            date: selectedDate,
+            status: currentStatus,
+            attendance_type_id: statusMap[currentStatus],
+            notes: tempNote || null,
+            created_by: userId
+          }, { onConflict: 'student_id,date' });
+
+        if (error) throw error;
+        if (showToast) showToast('Comentario guardado correctamente', 'success');
+      } catch (err: any) {
+        console.error('Error saving individual note:', err);
+        if (showToast) showToast('Error al guardar comentario: ' + err.message, 'error');
+      } finally {
+        setSavingNote(false);
+        setNoteModalStudent(null);
+      }
+    } else {
+      // If not marked yet, just close and it will be saved with the bulk save
+      setNoteModalStudent(null);
+      if (showToast) showToast('Comentario guardado localmente. Se aplicará al registrar la asistencia.', 'info');
     }
   };
 
@@ -645,7 +699,17 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
                 </div>
                 <div className="min-w-0">
                   <h4 className="font-black text-slate-800 text-base mb-1 tracking-tight">{student.name}</h4>
-                  <p className="text-[10px] text-slate-400 font-black tracking-widest">DNI: {student.dni}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-[10px] text-slate-400 font-black tracking-widest uppercase">DNI: {student.dni}</p>
+                    {notes[student.id] && (
+                      <div className="flex items-center gap-1 bg-brand-celeste/10 text-brand-celeste px-2 py-0.5 rounded-lg border border-brand-celeste/20">
+                        <MessageSquare size={10} />
+                        <span className="text-[9px] font-black tracking-tight truncate max-w-[100px]">
+                          {notes[student.id]}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -667,7 +731,14 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <button className="p-3 bg-slate-50 rounded-xl text-slate-400 hover:text-brand-celeste transition-colors">
+                  <button
+                    onClick={() => openNoteModal(student)}
+                    className={`p-3 rounded-xl transition-all shadow-sm ${notes[student.id]
+                      ? 'bg-brand-celeste text-white shadow-brand-celeste/20'
+                      : 'bg-slate-50 text-slate-400 hover:text-brand-celeste hover:bg-cyan-50'
+                      }`}
+                    title="Agregar comentario"
+                  >
                     <MessageSquare size={18} />
                   </button>
                   <button className="p-3 text-slate-300 hover:text-slate-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -703,6 +774,49 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
           }
         </button>
       </div>
+
+      {/* Note/Comment Modal */}
+      {noteModalStudent && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95 duration-200">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-14 h-14 bg-brand-celeste/10 rounded-2xl flex items-center justify-center text-brand-celeste">
+                <MessageSquare size={28} />
+              </div>
+              <div>
+                <h3 className="text-xl font-black text-slate-800 italic">OBSERVACIÓN / NOTA</h3>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Estudiante: {noteModalStudent.name}</p>
+              </div>
+            </div>
+
+            <textarea
+              value={tempNote}
+              onChange={(e) => setTempNote(e.target.value)}
+              placeholder="Escribe aquí cualquier observación o razón del cambio de estado..."
+              className="w-full h-40 px-6 py-5 rounded-3xl bg-slate-50 border-2 border-slate-100 focus:border-brand-celeste focus:bg-white outline-none transition-all text-sm font-medium text-slate-600 resize-none mb-6"
+              autoFocus
+            />
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setNoteModalStudent(null)}
+                disabled={savingNote}
+                className="flex-1 bg-slate-50 text-slate-400 py-4 rounded-2xl font-black text-[10px] tracking-[0.2em] uppercase hover:bg-slate-100 transition-all"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={savingNote}
+                className="flex-1 bg-brand-celeste text-white py-4 rounded-2xl font-black text-[10px] tracking-[0.2em] uppercase shadow-lg shadow-cyan-100 hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2"
+              >
+                {savingNote ? <Loader2 className="animate-spin" size={16} /> : <Check size={16} />}
+                {savingNote ? 'GUARDANDO...' : 'GUARDAR NOTA'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
