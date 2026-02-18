@@ -218,6 +218,37 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
         });
     };
 
+    const handleToggleRole = (studentId: string, role: FamilyMemberType) => {
+        setAttendance(prev => {
+            const record = prev[studentId];
+            if (!record) return prev;
+
+            let newType: FamilyMemberType = record.familyMember;
+
+            if (role === 'otro_familiar') {
+                newType = 'otro_familiar';
+            } else if (role === 'padre') {
+                if (record.familyMember === 'madre') newType = 'ambos';
+                else if (record.familyMember === 'ambos') newType = 'madre';
+                else if (record.familyMember === 'padre') return prev; // Mantener uno seleccionado
+                else newType = 'padre';
+            } else if (role === 'madre') {
+                if (record.familyMember === 'padre') newType = 'ambos';
+                else if (record.familyMember === 'ambos') newType = 'padre';
+                else if (record.familyMember === 'madre') return prev; // Mantener uno seleccionado
+                else newType = 'madre';
+            }
+
+            return {
+                ...prev,
+                [studentId]: {
+                    ...record,
+                    familyMember: newType
+                }
+            };
+        });
+    };
+
     const setFamilyMember = (studentId: string, type: FamilyMemberType) => {
         setAttendance(prev => ({
             ...prev,
@@ -651,16 +682,49 @@ const MeetingAttendanceSheet: React.FC<MeetingAttendanceSheetProps> = ({
                                             </button>
 
                                             {isAttended && (
-                                                <select
-                                                    value={record.familyMember}
-                                                    onChange={(e) => setFamilyMember(student.id, e.target.value as FamilyMemberType)}
-                                                    className="px-4 py-3 rounded-xl border border-slate-200 focus:border-brand-celeste outline-none text-sm font-bold text-slate-700 bg-white"
-                                                >
-                                                    <option value="padre">Padre</option>
-                                                    <option value="madre">Madre</option>
-                                                    <option value="ambos">Ambos (P y M)</option>
-                                                    <option value="otro_familiar">Otro Familiar</option>
-                                                </select>
+                                                <div className="flex flex-wrap gap-4 items-center bg-slate-50/50 px-4 py-2 rounded-2xl border border-slate-100">
+                                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                                        <div
+                                                            onClick={() => handleToggleRole(student.id, 'padre')}
+                                                            className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${(record.familyMember === 'padre' || record.familyMember === 'ambos')
+                                                                    ? 'bg-blue-500 border-blue-500 shadow-sm'
+                                                                    : 'border-slate-300 bg-white group-hover:border-blue-400'
+                                                                }`}
+                                                        >
+                                                            {(record.familyMember === 'padre' || record.familyMember === 'ambos') && <Check size={12} className="text-white stroke-[4]" />}
+                                                        </div>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tighter ${(record.familyMember === 'padre' || record.familyMember === 'ambos') ? 'text-blue-600' : 'text-slate-400'
+                                                            }`}>Padre</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                                        <div
+                                                            onClick={() => handleToggleRole(student.id, 'madre')}
+                                                            className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${(record.familyMember === 'madre' || record.familyMember === 'ambos')
+                                                                    ? 'bg-pink-500 border-pink-500 shadow-sm'
+                                                                    : 'border-slate-300 bg-white group-hover:border-pink-400'
+                                                                }`}
+                                                        >
+                                                            {(record.familyMember === 'madre' || record.familyMember === 'ambos') && <Check size={12} className="text-white stroke-[4]" />}
+                                                        </div>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tighter ${(record.familyMember === 'madre' || record.familyMember === 'ambos') ? 'text-pink-600' : 'text-slate-400'
+                                                            }`}>Madre</span>
+                                                    </label>
+
+                                                    <label className="flex items-center gap-2 cursor-pointer group">
+                                                        <div
+                                                            onClick={() => handleToggleRole(student.id, 'otro_familiar')}
+                                                            className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${record.familyMember === 'otro_familiar'
+                                                                    ? 'bg-purple-500 border-purple-500 shadow-sm'
+                                                                    : 'border-slate-300 bg-white group-hover:border-purple-400'
+                                                                }`}
+                                                        >
+                                                            {record.familyMember === 'otro_familiar' && <Check size={12} className="text-white stroke-[4]" />}
+                                                        </div>
+                                                        <span className={`text-[11px] font-black uppercase tracking-tighter ${record.familyMember === 'otro_familiar' ? 'text-purple-600' : 'text-slate-400'
+                                                            }`}>Otro</span>
+                                                    </label>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
