@@ -8,7 +8,6 @@ import {
   UserCheck,
   CalendarCheck,
   Info,
-  MoreVertical,
   Loader2,
   User,
   Calendar,
@@ -741,9 +740,6 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
                   >
                     <MessageSquare size={18} />
                   </button>
-                  <button className="p-3 text-slate-300 hover:text-slate-500 lg:opacity-0 group-hover:opacity-100 transition-opacity">
-                    <MoreVertical size={18} />
-                  </button>
                 </div>
               </div>
             </div>
@@ -757,8 +753,8 @@ const AttendanceSheet: React.FC<AttendanceSheetProps> = ({ classroom, userId, us
           onClick={saveAttendance}
           disabled={saving}
           className={`w-full py-5 rounded-[2rem] font-black text-sm tracking-[0.1em] shadow-2xl flex items-center justify-center gap-3 transition-all disabled:opacity-70 disabled:cursor-not-allowed ${isToday
-              ? 'bg-brand-celeste text-white hover:bg-cyan-600 shadow-cyan-200'
-              : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
+            ? 'bg-brand-celeste text-white hover:bg-cyan-600 shadow-cyan-200'
+            : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-200'
             }`}
         >
           {saving ? (
