@@ -36,6 +36,10 @@ import RequireAuth from './components/RequireAuth.tsx';
 import { supabase } from './lib/supabase';
 import logo from './image/logo.png';
 
+const IDLE_TIMEOUT = 2 * 60 * 60 * 1000; // 2 hours in ms
+const CHECK_INTERVAL = 60 * 1000; // 1 minute in ms
+const ACTIVITY_KEY = 'vc_last_activity';
+
 const App: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -80,8 +84,50 @@ const App: React.FC = () => {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
+
+  // Idle Timeout Logic
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const checkIdleTimeout = () => {
+      const lastActivity = localStorage.getItem(ACTIVITY_KEY);
+      if (lastActivity) {
+        const timeSinceLastActivity = Date.now() - parseInt(lastActivity, 10);
+        if (timeSinceLastActivity > IDLE_TIMEOUT) {
+          console.warn('Idle timeout reached, signing out...');
+          handleLogout();
+          return true;
+        }
+      }
+      return false;
+    };
+
+    if (checkIdleTimeout()) return;
+
+    const updateActivity = () => {
+      localStorage.setItem(ACTIVITY_KEY, Date.now().toString());
+    };
+
+    updateActivity();
+
+    const events = ['mousedown', 'keydown', 'mousemove', 'scroll', 'touchstart'];
+    events.forEach(eventName => {
+      window.addEventListener(eventName, updateActivity);
+    });
+
+    const interval = setInterval(checkIdleTimeout, CHECK_INTERVAL);
+
+    return () => {
+      events.forEach(eventName => {
+        window.removeEventListener(eventName, updateActivity);
+      });
+      clearInterval(interval);
+    };
+  }, [currentUser]);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -97,6 +143,7 @@ const App: React.FC = () => {
       const roleMap: Record<string, UserRole> = {
         'admin': 'Administrador',
         'docente': 'Docente',
+        'docente_ingles': 'Docente',
         'auxiliar': 'Auxiliar',
         'supervisor': 'Supervisor' as any,
         'subdirector': 'Administrador',
@@ -127,14 +174,21 @@ const App: React.FC = () => {
       });
     } catch (err) {
       console.error('Error fetching profile:', err);
+      handleLogout();
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    window.location.href = import.meta.env.VITE_PORTAL_URL || '/';
+    try {
+      await supabase.auth.signOut();
+    } catch (err) {
+      console.error('Error during signOut:', err);
+    }
+    setCurrentUser(null);
+    localStorage.removeItem(ACTIVITY_KEY);
+    window.location.href = import.meta.env.VITE_PORTAL_URL || 'https://portal-vc-academico.vercel.app';
   };
 
   const navItems = [
