@@ -188,7 +188,8 @@ const App: React.FC = () => {
     }
     setCurrentUser(null);
     localStorage.removeItem(ACTIVITY_KEY);
-    window.location.href = import.meta.env.VITE_PORTAL_URL || 'https://portal-vc-academico.vercel.app';
+    const portalUrl = import.meta.env.VITE_PORTAL_URL || 'https://portal-vc-academico.vercel.app';
+    window.location.href = `${portalUrl}?view=login`;
   };
 
   const navItems = [

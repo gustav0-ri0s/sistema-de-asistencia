@@ -27,7 +27,7 @@ export const RequireAuth = ({ children, allowedRoles = DEFAULT_ALLOWED_ROLES }: 
 
                 if (sessionError || !currentSession) {
                     const returnTo = encodeURIComponent(window.location.href);
-                    window.location.href = `${portalUrl}/login?returnTo=${returnTo}`;
+                    window.location.href = `${portalUrl}?view=login&returnTo=${returnTo}`;
                     return;
                 }
 
